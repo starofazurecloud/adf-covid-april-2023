@@ -1,0 +1,184 @@
+{
+	"name": "Demo_2_FilestoFolders",
+	"properties": {
+		"activities": [
+			{
+				"name": "Get Metadata of Files",
+				"type": "GetMetadata",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"dataset": {
+						"referenceName": "ds_AzureBlobFiles",
+						"type": "DatasetReference"
+					},
+					"fieldList": [
+						"childItems",
+						"itemName",
+						"itemType",
+						"lastModified",
+						"exists"
+					],
+					"storeSettings": {
+						"type": "AzureBlobStorageReadSettings",
+						"recursive": true,
+						"enablePartitionDiscovery": false
+					},
+					"formatSettings": {
+						"type": "DelimitedTextReadSettings"
+					}
+				}
+			},
+			{
+				"name": "LoopthruAllFiles",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Get Metadata of Files",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Get Metadata of Files').output.childItems",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "Set File Name",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "varFileName",
+								"value": {
+									"value": "@split(item().name,'.')[0]",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Set Folder Name",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "Set File Name",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "varFolderName",
+								"value": {
+									"value": "@substring(variables('varFileName'),add(lastindexof(variables('varFileName'),'_'),1),sub(length(variables('varFileName')) , add(lastindexof(variables('varFileName'),'_'),1)  ))",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "Copy From a File and Put it in Folder",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "Set Folder Name",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "DelimitedTextSource",
+									"storeSettings": {
+										"type": "AzureBlobStorageReadSettings",
+										"recursive": true,
+										"enablePartitionDiscovery": false
+									},
+									"formatSettings": {
+										"type": "DelimitedTextReadSettings"
+									}
+								},
+								"sink": {
+									"type": "DelimitedTextSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "DelimitedTextWriteSettings",
+										"quoteAllText": true,
+										"fileExtension": ".txt"
+									}
+								},
+								"enableStaging": false,
+								"translator": {
+									"type": "TabularTranslator",
+									"typeConversion": true,
+									"typeConversionSettings": {
+										"allowDataTruncation": true,
+										"treatBooleanAsNumber": false
+									}
+								}
+							},
+							"inputs": [
+								{
+									"referenceName": "ds_demo2_source",
+									"type": "DatasetReference",
+									"parameters": {
+										"srcFileName": {
+											"value": "@item().name",
+											"type": "Expression"
+										}
+									}
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "ds_demo2_tgt",
+									"type": "DatasetReference",
+									"parameters": {
+										"tgtFolderName": {
+											"value": "@variables('varFolderName')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"varFileName": {
+				"type": "String"
+			},
+			"varFolderName": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2023-04-10T10:20:24Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}
